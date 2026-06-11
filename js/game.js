@@ -1,4 +1,4 @@
-// ゲーム本体: 状態管理(TITLE/PLAYING/CLEAR/OVER/WIN)・ループ・衝突・HUD
+// ゲーム本体: 状態管理(TITLE/SELECT/PLAYING/CLEAR/WIN)・ループ・衝突・HUD
 
 class Game {
   constructor() {
@@ -6,11 +6,14 @@ class Game {
     this.ctx = this.canvas.getContext('2d');
     Input.init();
     this.state = 'TITLE';
-    this.lives = CONFIG.START_LIVES;
     this.score = 0;
     this.stageIndex = 0;
     this.timer = 0;
     this.frame = 0;
+    // ステージ選択の進行状態
+    this.unlocked = 1;          // 解放済み面数
+    this.cleared = new Set();   // クリア済み面のindex
+    this.selectIndex = 0;       // 選択カーソル
     // デバッグ: index.html?stage=5 でそのステージから開始
     const m = location.search.match(/stage=([1-9])/);
     this.startStage = m ? parseInt(m[1], 10) - 1 : 0;
@@ -28,10 +31,31 @@ class Game {
   }
 
   newGame() {
-    this.lives = CONFIG.START_LIVES;
     this.score = 0;
-    this.loadStage(this.startStage);
-    this.state = 'PLAYING';
+    this.cleared = new Set();
+    if (this.startStage > 0) {
+      // デバッグ: 全面解放してそのまま該当面を開始
+      this.unlocked = LEVELS.length;
+      this.selectIndex = this.startStage;
+      this.loadStage(this.startStage);
+      this.state = 'PLAYING';
+    } else {
+      this.unlocked = 1;
+      this.selectIndex = 0;
+      this.state = 'SELECT';
+    }
+  }
+
+  // ワールドマップ上の各ステージノードの座標
+  mapNodes() {
+    const nodes = [];
+    for (let i = 0; i < LEVELS.length; i++) {
+      nodes.push({
+        x: 90 + i * 95,
+        y: 250 + Math.sin(i * 0.9) * 70,
+      });
+    }
+    return nodes;
   }
 
   loadStage(i) {
@@ -58,23 +82,38 @@ class Game {
       case 'TITLE':
         if (Input.jumpPressed) this.newGame();
         break;
+      case 'SELECT':
+        this.updateSelect();
+        break;
       case 'PLAYING':
         this.updatePlaying();
         break;
       case 'CLEAR':
         if (--this.timer <= 0) {
-          if (this.stageIndex + 1 < LEVELS.length) {
-            this.loadStage(this.stageIndex + 1);
-            this.state = 'PLAYING';
+          if (this.cleared.has(LEVELS.length - 1)) {
+            this.state = 'WIN'; // 最終面(ボス)クリア
           } else {
-            this.state = 'WIN';
+            this.selectIndex = Math.min(this.unlocked - 1, this.stageIndex + 1);
+            this.state = 'SELECT';
           }
         }
         break;
-      case 'OVER':
       case 'WIN':
         if (Input.jumpPressed) this.state = 'TITLE';
         break;
+    }
+  }
+
+  updateSelect() {
+    if (Input.pressed.has('ArrowLeft') || Input.pressed.has('KeyA')) {
+      this.selectIndex = Math.max(0, this.selectIndex - 1);
+    }
+    if (Input.pressed.has('ArrowRight') || Input.pressed.has('KeyD')) {
+      this.selectIndex = Math.min(this.unlocked - 1, this.selectIndex + 1);
+    }
+    if (Input.jumpPressed) {
+      this.loadStage(this.selectIndex);
+      this.state = 'PLAYING';
     }
   }
 
@@ -91,7 +130,11 @@ class Game {
 
     if (pl.dead) {
       pl.update(this.level, this.platforms);
-      if (pl.deathTimer > 90) this.onPlayerDeath();
+      if (pl.deathTimer > 90) {
+        // 死亡後はステージ選択画面へ(残機減やゲームオーバーはなし)
+        this.selectIndex = this.stageIndex;
+        this.state = 'SELECT';
+      }
       return;
     }
 
@@ -177,14 +220,11 @@ class Game {
     this.camera.follow(pl);
   }
 
-  onPlayerDeath() {
-    this.lives--;
-    if (this.lives <= 0) this.state = 'OVER';
-    else this.loadStage(this.stageIndex);
-  }
-
   stageClear() {
     this.score += 1000;
+    this.cleared.add(this.stageIndex);
+    // 次の面を解放
+    this.unlocked = Math.max(this.unlocked, Math.min(LEVELS.length, this.stageIndex + 2));
     this.state = 'CLEAR';
     this.timer = 120;
   }
@@ -203,6 +243,10 @@ class Game {
       this.drawTitle(ctx);
       return;
     }
+    if (this.state === 'SELECT') {
+      this.drawSelect(ctx);
+      return;
+    }
 
     const cam = this.camera;
     this.drawBackground(ctx, cam);
@@ -219,12 +263,6 @@ class Game {
 
     if (this.state === 'CLEAR') {
       this.overlay(ctx, [[`STAGE ${this.stageIndex + 1} CLEAR!`, 'bold 44px monospace', '#ffe27a', 250]]);
-    } else if (this.state === 'OVER') {
-      this.overlay(ctx, [
-        ['GAME OVER', 'bold 52px monospace', '#ff6b6b', 220],
-        [`SCORE ${this.score}`, 'bold 22px monospace', '#fff', 270],
-        ['PRESS SPACE', 'bold 20px monospace', '#ffe27a', 330],
-      ]);
     } else if (this.state === 'WIN') {
       this.overlay(ctx, [
         ['CONGRATULATIONS!', 'bold 48px monospace', '#ffe27a', 190],
@@ -288,11 +326,9 @@ class Game {
     ctx.textAlign = 'left';
     ctx.fillStyle = '#fff';
     ctx.fillText(`STAGE ${this.stageIndex + 1}/9`, 14, 21);
-    ctx.fillStyle = '#ff6b6b';
-    ctx.fillText('♥'.repeat(Math.max(0, this.lives)), 150, 21);
     if (this.player.big) {
       ctx.fillStyle = '#ffe27a';
-      ctx.fillText('POWER UP!', 240, 21);
+      ctx.fillText('POWER UP!', 150, 21);
     }
     ctx.textAlign = 'right';
     ctx.fillStyle = '#fff';
@@ -361,6 +397,144 @@ class Game {
       ctx.fillStyle = '#ffe27a';
       ctx.fillText('PRESS SPACE', CONFIG.WIDTH / 2, 392);
     }
+  }
+
+  drawSelect(ctx) {
+    const W = CONFIG.WIDTH, H = CONFIG.HEIGHT;
+
+    // 草原のワールドマップ背景
+    const grass = ctx.createLinearGradient(0, 60, 0, H);
+    grass.addColorStop(0, '#7ec96a');
+    grass.addColorStop(1, '#5bb152');
+    ctx.fillStyle = grass;
+    ctx.fillRect(0, 60, W, H - 60);
+    // 薄い草パッチ
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    for (let i = 0; i < 7; i++) {
+      const px = (i * 173 + 60) % W;
+      const py = 110 + (i % 3) * 90;
+      ctx.beginPath();
+      ctx.ellipse(px, py, 70, 26, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // 雲
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    for (let i = 0; i < 3; i++) {
+      const cx = 130 + i * 330, cy = 90 + (i % 2) * 24;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 18, 0, Math.PI * 2);
+      ctx.arc(cx + 22, cy - 9, 15, 0, Math.PI * 2);
+      ctx.arc(cx + 44, cy, 18, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const nodes = this.mapNodes();
+
+    // ノードをつなぐ小道(破線)
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 5;
+    ctx.setLineDash([2, 10]);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(nodes[0].x, nodes[0].y);
+    for (let i = 1; i < nodes.length; i++) ctx.lineTo(nodes[i].x, nodes[i].y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // 各ステージノード
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      const locked = i >= this.unlocked;
+      const done = this.cleared.has(i);
+      const isBoss = i === LEVELS.length - 1;
+
+      softShadow(ctx, n.x, n.y + 22, 22, 6);
+
+      let color;
+      if (locked) color = '#9aa0a6';
+      else if (done) color = '#36b24a';
+      else color = isBoss ? '#b5463f' : '#f2b134';
+      fillCircle(ctx, n.x, n.y, 22, color);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, 22, 0, Math.PI * 2);
+      ctx.stroke();
+      // 上面のツヤ
+      fillCircle(ctx, n.x - 6, n.y - 7, 6, 'rgba(255,255,255,0.35)');
+
+      ctx.textAlign = 'center';
+      if (locked) {
+        // 鍵マーク
+        ctx.fillStyle = '#555';
+        roundRect(ctx, n.x - 7, n.y - 1, 14, 12, 3);
+        ctx.fill();
+        ctx.strokeStyle = '#555';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(n.x, n.y - 1, 5, Math.PI, 0);
+        ctx.stroke();
+      } else if (isBoss) {
+        // ドクロ(ボス面)
+        fillCircle(ctx, n.x, n.y - 2, 9, '#fff');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(n.x - 6, n.y + 4, 12, 5);
+        ctx.fillStyle = '#b5463f';
+        fillCircle(ctx, n.x - 4, n.y - 2, 2.4, '#b5463f');
+        fillCircle(ctx, n.x + 4, n.y - 2, 2.4, '#b5463f');
+      } else {
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 22px monospace';
+        ctx.fillText(String(i + 1), n.x, n.y + 8);
+      }
+      // クリア済みの旗
+      if (done && !isBoss) {
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(n.x + 14, n.y - 22); ctx.lineTo(n.x + 14, n.y - 8);
+        ctx.stroke();
+        ctx.fillStyle = '#e6362a';
+        ctx.beginPath();
+        ctx.moveTo(n.x + 14, n.y - 22); ctx.lineTo(n.x + 24, n.y - 19); ctx.lineTo(n.x + 14, n.y - 16);
+        ctx.fill();
+      }
+    }
+
+    // 選択カーソル(リング + ヒーロー)
+    const sel = nodes[this.selectIndex];
+    const pulse = 22 + Math.sin(this.frame * 0.15) * 3;
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(sel.x, sel.y, pulse + 6, 0, Math.PI * 2);
+    ctx.stroke();
+    const hop = Math.abs(Math.sin(this.frame * 0.12)) * 8;
+    const hw = 20, hh = 56, sc = 0.9;
+    softShadow(ctx, sel.x, sel.y - 24, 16, 4);
+    ctx.save();
+    ctx.translate(sel.x - (hw * sc) / 2, sel.y - 30 - hh * sc - hop);
+    ctx.scale(sc, sc);
+    drawHeroBody(ctx, hw, hh, false, 1, this.frame * 0.2, true, hop < 2, this.frame % 200 < 10);
+    ctx.restore();
+
+    // タイトル帯
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(0, 0, W, 60);
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 30px sans-serif';
+    ctx.fillStyle = '#fff';
+    ctx.fillText('ステージをえらぼう', W / 2, 40);
+
+    // 下部: 選択中の面名 + 操作ヒント
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.fillRect(0, H - 56, W, 56);
+    ctx.fillStyle = '#ffe27a';
+    ctx.font = 'bold 22px monospace';
+    ctx.fillText(LEVELS[this.selectIndex].name, W / 2, H - 30);
+    ctx.fillStyle = '#d8e8ff';
+    ctx.font = '15px sans-serif';
+    ctx.fillText('←→ でえらぶ / スペースで けってい', W / 2, H - 10);
   }
 }
 
