@@ -23,6 +23,12 @@ const CONFIG = {
   COYOTE: 6,            // 地面を離れてからジャンプを受け付けるフレーム数
   JUMP_BUFFER: 7,       // 着地前にジャンプを押しておける先行入力フレーム数
 
+  // 壁ずり・壁キック
+  WALL_SLIDE_SPEED: 2.3,  // 壁に張り付いて落ちるときの最大落下速度
+  WALL_KICK_VX: 5.0,      // 壁を蹴って横に飛ぶ初速
+  WALL_KICK_VY: -12.0,    // 壁を蹴って上に飛ぶ初速
+  WALL_KICK_LOCK: 9,      // 壁キック直後に横入力を弱めるフレーム数
+
   START_LIVES: 3,
   INVINCIBLE_FRAMES: 90,
 };

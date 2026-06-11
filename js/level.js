@@ -78,6 +78,31 @@ class Level {
             ctx.fillStyle = '#3aa53a';
             fillCircle(ctx, x + 8, y + 11, 4, '#4cb845');
             fillCircle(ctx, x + 22, y + 11, 4, '#4cb845');
+            // 列ごとに固定の飾り(チラつかないよう c でハッシュ)
+            const hsh = (c * 2654435761) >>> 0;
+            const deco = hsh % 5;
+            if (deco === 0) {
+              // 花
+              const fx = x + 10 + (hsh >> 8) % 12, fy = y - 5;
+              const petal = ['#ff7eb6', '#ffd24a', '#fff'][(hsh >> 3) % 3];
+              for (let k = 0; k < 5; k++) {
+                const a = (k / 5) * Math.PI * 2;
+                fillCircle(ctx, fx + Math.cos(a) * 3, fy + Math.sin(a) * 3, 2, petal);
+              }
+              fillCircle(ctx, fx, fy, 1.8, '#ffcf3a');
+            } else if (deco === 1) {
+              // 草の葉
+              ctx.strokeStyle = '#2f9e34';
+              ctx.lineWidth = 2;
+              const gx = x + 8 + (hsh >> 6) % 14;
+              ctx.beginPath();
+              ctx.moveTo(gx, y); ctx.quadraticCurveTo(gx - 3, y - 7, gx - 5, y - 9);
+              ctx.moveTo(gx, y); ctx.quadraticCurveTo(gx + 3, y - 7, gx + 5, y - 9);
+              ctx.stroke();
+            } else if (deco === 2) {
+              // 小石
+              fillCircle(ctx, x + 14 + (hsh >> 5) % 8, y + 7, 2.2, '#cdb89a');
+            }
           }
           // タイル境界の陰
           ctx.strokeStyle = 'rgba(0,0,0,0.12)';

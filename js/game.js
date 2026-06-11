@@ -304,6 +304,21 @@ class Game {
     drawHills(-0.15, H - 90, 40, '#9fd98a');
     drawHills(-0.28, H - 55, 55, '#7ec96a');
 
+    // 木(丘の手前、ゆるいパララックス)
+    const treeBase = H - 64;
+    for (let i = 0; i < 8; i++) {
+      const tx = mod(i * 220 + 60 - cam.x * 0.4, W + 440) - 220;
+      const s = 0.8 + (i % 3) * 0.2;
+      ctx.fillStyle = '#7a4a24';
+      ctx.fillRect(tx - 4 * s, treeBase - 26 * s, 8 * s, 30 * s);
+      ctx.fillStyle = i % 2 ? '#4fae46' : '#43a23e';
+      fillCircle(ctx, tx, treeBase - 34 * s, 18 * s, i % 2 ? '#4fae46' : '#43a23e');
+      fillCircle(ctx, tx - 13 * s, treeBase - 26 * s, 13 * s, i % 2 ? '#4fae46' : '#43a23e');
+      fillCircle(ctx, tx + 13 * s, treeBase - 26 * s, 13 * s, i % 2 ? '#4fae46' : '#43a23e');
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      fillCircle(ctx, tx - 6 * s, treeBase - 40 * s, 6 * s, 'rgba(255,255,255,0.18)');
+    }
+
     // 雲(丸を重ねたふわふわ、パララックス)
     for (let i = 0; i < 6; i++) {
       const cx = mod(i * 277 + 80 - cam.x * 0.5, W + 240) - 120;
@@ -377,8 +392,9 @@ class Game {
     ctx.fillText('←→ / A D で移動 スペース / ↑ / W でジャンプ', CONFIG.WIDTH / 2, 255);
     ctx.font = '16px sans-serif';
     ctx.fillStyle = '#d8e8ff';
-    ctx.fillText('敵は上から踏んでたおせる! キノコでパワーアップ!', CONFIG.WIDTH / 2, 288);
-    ctx.fillText('全9ステージのさいごに待つ魔王をたおせ!', CONFIG.WIDTH / 2, 318);
+    ctx.fillText('敵は上から踏んでたおせる! キノコでパワーアップ!', CONFIG.WIDTH / 2, 285);
+    ctx.fillText('壁にはりついてジャンプで壁キック!', CONFIG.WIDTH / 2, 312);
+    ctx.fillText('全9ステージのさいごに待つ魔王をたおせ!', CONFIG.WIDTH / 2, 339);
 
     // 主人公のイラスト(地面の上でぴょこぴょこ)
     const hop = Math.abs(Math.sin(this.frame * 0.06)) * 10;
