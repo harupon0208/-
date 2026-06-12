@@ -44,8 +44,10 @@ class Level {
     return t === '#' || t === '=';
   }
 
-  draw(ctx, cam) {
+  draw(ctx, cam, theme) {
     const T = CONFIG.TILE;
+    const tl = (theme && theme.tile) || THEMES[0].tile;
+    const sheet = Themes.tileSheet(theme); // 焼いたタイル(無ければ null でフォールバック)
     const c0 = Math.max(0, Math.floor(cam.x / T));
     const c1 = Math.min(this.cols - 1, Math.ceil((cam.x + CONFIG.WIDTH) / T));
     for (let r = 0; r < this.rows; r++) {
@@ -54,75 +56,75 @@ class Level {
         if (t === '.') continue;
         const x = c * T - cam.x, y = r * T;
         if (t === '#') {
-          // 土(縦グラデ)
-          const dirt = ctx.createLinearGradient(0, y, 0, y + T);
-          dirt.addColorStop(0, '#b07038');
-          dirt.addColorStop(1, '#7c4a22');
-          ctx.fillStyle = dirt;
-          ctx.fillRect(x, y, T, T);
-          // 土の粒
-          ctx.fillStyle = 'rgba(0,0,0,0.10)';
-          ctx.fillRect(x + 6, y + 14, 3, 3);
-          ctx.fillRect(x + 20, y + 22, 3, 3);
-          ctx.fillRect(x + 14, y + 8, 2, 2);
-          // 上面が空いていれば草
-          if (!this.solidAt(c, r - 1)) {
-            const grass = ctx.createLinearGradient(0, y, 0, y + 12);
-            grass.addColorStop(0, '#62cf52');
-            grass.addColorStop(1, '#3aa53a');
-            ctx.fillStyle = grass;
-            ctx.fillRect(x, y, T, 11);
-            ctx.fillStyle = '#7be06a';
-            ctx.fillRect(x, y, T, 3);
-            // 草のふさ(丸)
-            ctx.fillStyle = '#3aa53a';
-            fillCircle(ctx, x + 8, y + 11, 4, '#4cb845');
-            fillCircle(ctx, x + 22, y + 11, 4, '#4cb845');
-            // 列ごとに固定の飾り(チラつかないよう c でハッシュ)
-            const hsh = (c * 2654435761) >>> 0;
-            const deco = hsh % 5;
-            if (deco === 0) {
-              // 花
-              const fx = x + 10 + (hsh >> 8) % 12, fy = y - 5;
-              const petal = ['#ff7eb6', '#ffd24a', '#fff'][(hsh >> 3) % 3];
-              for (let k = 0; k < 5; k++) {
-                const a = (k / 5) * Math.PI * 2;
-                fillCircle(ctx, fx + Math.cos(a) * 3, fy + Math.sin(a) * 3, 2, petal);
-              }
-              fillCircle(ctx, fx, fy, 1.8, '#ffcf3a');
-            } else if (deco === 1) {
-              // 草の葉
-              ctx.strokeStyle = '#2f9e34';
-              ctx.lineWidth = 2;
-              const gx = x + 8 + (hsh >> 6) % 14;
-              ctx.beginPath();
-              ctx.moveTo(gx, y); ctx.quadraticCurveTo(gx - 3, y - 7, gx - 5, y - 9);
-              ctx.moveTo(gx, y); ctx.quadraticCurveTo(gx + 3, y - 7, gx + 5, y - 9);
-              ctx.stroke();
-            } else if (deco === 2) {
-              // 小石
-              fillCircle(ctx, x + 14 + (hsh >> 5) % 8, y + 7, 2.2, '#cdb89a');
-            }
+          const cap = !this.solidAt(c, r - 1);
+          if (sheet) {
+            ctx.drawImage(sheet, cap ? T : 0, 0, T, T, x, y, T, T);
+            if (cap) this._capDeco(ctx, tl, x, y, c); // ランダムな飾りだけ上描き(軽い)
+          } else {
+            this._dirtFallback(ctx, tl, x, y, c, cap);
           }
-          // タイル境界の陰
-          ctx.strokeStyle = 'rgba(0,0,0,0.12)';
-          ctx.strokeRect(x + 0.5, y + 0.5, T - 1, T - 1);
         } else {
-          // ブロック(ベベル付き)
-          fillRound(ctx, x + 1, y + 1, T - 2, T - 2, 5, '#e8a33d');
-          ctx.fillStyle = 'rgba(255,255,255,0.4)';
-          fillRound(ctx, x + 3, y + 3, T - 6, 5, 2, 'rgba(255,255,255,0.4)');
-          ctx.fillStyle = 'rgba(0,0,0,0.18)';
-          fillRound(ctx, x + 3, y + T - 8, T - 6, 5, 2, 'rgba(0,0,0,0.18)');
-          // リベット
-          ctx.fillStyle = '#a06a18';
-          fillCircle(ctx, x + 6, y + 6, 1.6, '#a06a18');
-          fillCircle(ctx, x + T - 6, y + 6, 1.6, '#a06a18');
-          fillCircle(ctx, x + 6, y + T - 6, 1.6, '#a06a18');
-          fillCircle(ctx, x + T - 6, y + T - 6, 1.6, '#a06a18');
+          if (sheet) ctx.drawImage(sheet, T * 2, 0, T, T, x, y, T, T);
+          else this._blockFallback(ctx, tl, x, y);
         }
       }
     }
+  }
+
+  // 天面のランダム飾り(花・草の葉・小石・結晶)。焼いたタイルの上に軽く重ねる
+  _capDeco(ctx, tl, x, y, c) {
+    const hsh = (c * 2654435761) >>> 0;
+    if (tl.cap === 'grass') {
+      const deco = hsh % 5;
+      if (deco === 0) {
+        const fx = x + 10 + (hsh >> 8) % 12, fy = y - 5;
+        for (let k = 0; k < 5; k++) {
+          const a = (k / 5) * Math.PI * 2;
+          fillCircle(ctx, fx + Math.cos(a) * 3, fy + Math.sin(a) * 3, 2, tl.deco);
+        }
+        fillCircle(ctx, fx, fy, 1.8, '#ffcf3a');
+      } else if (deco === 1) {
+        ctx.strokeStyle = tl.accent;
+        ctx.lineWidth = 2;
+        const gx = x + 8 + (hsh >> 6) % 14;
+        ctx.beginPath();
+        ctx.moveTo(gx, y); ctx.quadraticCurveTo(gx - 3, y - 7, gx - 5, y - 9);
+        ctx.moveTo(gx, y); ctx.quadraticCurveTo(gx + 3, y - 7, gx + 5, y - 9);
+        ctx.stroke();
+      }
+    } else if (tl.cap === 'rock') {
+      if (hsh % 4 === 0) fillCircle(ctx, x + 14 + (hsh >> 5) % 8, y + 6, 2, tl.deco);
+    }
+  }
+
+  // フォールバック(オフスクリーンが使えない環境向けの直接描画)
+  _dirtFallback(ctx, tl, x, y, c, cap) {
+    const T = CONFIG.TILE;
+    const dirt = ctx.createLinearGradient(0, y, 0, y + T);
+    dirt.addColorStop(0, tl.dirtTop);
+    dirt.addColorStop(1, tl.dirtBottom);
+    ctx.fillStyle = dirt;
+    ctx.fillRect(x, y, T, T);
+    if (cap) {
+      ctx.fillStyle = tl.capTop;
+      ctx.fillRect(x, y, T, 11);
+      ctx.fillStyle = tl.capHi;
+      ctx.fillRect(x, y, T, 3);
+      this._capDeco(ctx, tl, x, y, c);
+    }
+    ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+    ctx.strokeRect(x + 0.5, y + 0.5, T - 1, T - 1);
+  }
+
+  _blockFallback(ctx, tl, x, y) {
+    const T = CONFIG.TILE;
+    fillRound(ctx, x + 1, y + 1, T - 2, T - 2, 5, tl.block);
+    fillRound(ctx, x + 3, y + 3, T - 6, 5, 2, 'rgba(255,255,255,0.4)');
+    fillRound(ctx, x + 3, y + T - 8, T - 6, 5, 2, 'rgba(0,0,0,0.18)');
+    fillCircle(ctx, x + 6, y + 6, 1.6, tl.blockEdge);
+    fillCircle(ctx, x + T - 6, y + 6, 1.6, tl.blockEdge);
+    fillCircle(ctx, x + 6, y + T - 6, 1.6, tl.blockEdge);
+    fillCircle(ctx, x + T - 6, y + T - 6, 1.6, tl.blockEdge);
   }
 }
 

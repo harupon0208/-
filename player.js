@@ -200,6 +200,8 @@ class Player {
 
     const prevOnGround = this.onGround;
     const prevBottom = this.y + this.h;
+    this.justJumped = false;
+    this.justWallKicked = false;
     if (this.wallKickLock > 0) this.wallKickLock--;
 
     // --- 横移動(地上/空中で効きを変え、反転時はさらに強く) ---
@@ -239,6 +241,7 @@ class Player {
       this.coyote = 0;
       this.buffer = 0;
       this.jumping = true;
+      this.justJumped = true;
       Particles.dust(this.x + this.w / 2, this.y + this.h, 0, 4);
     } else if (this.buffer > 0 && this.wallDir !== 0 && !this.onGround) {
       // 壁キック: 壁と反対方向へ斜め上に飛ぶ
@@ -248,6 +251,7 @@ class Player {
       this.wallKickLock = CONFIG.WALL_KICK_LOCK;
       this.buffer = 0;
       this.jumping = true;
+      this.justWallKicked = true;
       this.wallSliding = false;
       const wx = this.wallDir > 0 ? this.x + this.w : this.x;
       Particles.dust(wx, this.y + this.h * 0.5, this.wallDir, 7);
@@ -309,6 +313,7 @@ class Player {
     this.big = true;
     this.y -= this.hBig - this.h;
     this.h = this.hBig;
+    this.squash = 10; // パワーアップでぷるんと拡大
   }
 
   shrink() {

@@ -34,6 +34,19 @@ function softShadow(ctx, cx, cy, rx, ry) {
   ctx.fill();
 }
 
+// 加算合成のソフトな発光。color は 'r,g,b'
+function glow(ctx, x, y, r, color, alpha = 0.6) {
+  ctx.globalCompositeOperation = 'lighter';
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, `rgba(${color},${alpha})`);
+  g.addColorStop(1, `rgba(${color},0)`);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+}
+
 // パーティクルの単一プール(Input と同じくグローバルなシングルトン)
 const Particles = {
   list: [],
@@ -74,8 +87,40 @@ const Particles = {
     }
   },
 
+  // 上にふわっと上がるスコア文字
+  popup(x, y, text, color = '255,255,255') {
+    this.list.push({ type: 'popup', x, y, vy: -1.1, text, color, life: 46, max: 46 });
+  },
+
+  // 爆発状のきらめき(加算発光)
+  burst(x, y, color = '255,200,80', n = 16, spd = 4) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const s = spd * (0.4 + Math.random() * 0.8);
+      this.list.push({
+        type: 'spark', x, y,
+        vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+        g: 0.06, r: 2 + Math.random() * 2.4,
+        life: 24 + Math.random() * 16, max: 40, color,
+      });
+    }
+  },
+
+  // 打ち上げ花火(複数色)
+  firework(x, y) {
+    const cols = ['255,120,120', '255,230,120', '120,220,255', '180,255,150', '255,180,240'];
+    this.burst(x, y, cols[(Math.random() * cols.length) | 0], 22, 5);
+  },
+
+  // 広がる衝撃波のリング
+  shock(x, y, color = '255,255,255') {
+    this.list.push({ type: 'shock', x, y, r: 6, grow: 3.4, life: 18, max: 18, color });
+  },
+
   update() {
     for (const p of this.list) {
+      if (p.type === 'shock') { p.r += p.grow; p.grow *= 0.92; p.life--; continue; }
+      if (p.type === 'popup') { p.y += p.vy; p.vy *= 0.9; p.life--; continue; }
       p.vy += p.g;
       p.vx *= 0.96;
       p.x += p.vx;
@@ -94,6 +139,28 @@ const Particles = {
         ctx.beginPath();
         ctx.arc(x, y, p.r * (0.6 + a * 0.4), 0, Math.PI * 2);
         ctx.fill();
+      } else if (p.type === 'spark') {
+        glow(ctx, x, y, p.r * 4, p.color, a * 0.8);
+        fillCircle(ctx, x, y, p.r * a, `rgba(${p.color},${a.toFixed(3)})`);
+      } else if (p.type === 'shock') {
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = `rgba(${p.color},${(a * 0.7).toFixed(3)})`;
+        ctx.lineWidth = 3 * a + 1;
+        ctx.beginPath();
+        ctx.arc(x, y, p.r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalCompositeOperation = 'source-over';
+      } else if (p.type === 'popup') {
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, a * 1.6);
+        ctx.font = 'bold 18px monospace';
+        ctx.textAlign = 'center';
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+        ctx.strokeText(p.text, x, y);
+        ctx.fillStyle = `rgb(${p.color})`;
+        ctx.fillText(p.text, x, y);
+        ctx.restore();
       } else {
         ctx.save();
         ctx.translate(x, y);
