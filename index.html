@@ -2,8 +2,10 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>スーパージャンプクエスト</title>
 <style>
+  html, body { overscroll-behavior: none; }
   body {
     margin: 0;
     min-height: 100vh;
@@ -20,11 +22,54 @@
     max-width: 96vw;
   }
   p { color: #8888aa; font-size: 12px; }
+
+  /* タッチ操作ボタン: 既定は非表示(PC)。タッチ端末(スマホ等)でのみ表示 */
+  .touch-controls { display: none; }
+  @media (hover: none) and (pointer: coarse) {
+    .touch-controls { display: block; }
+    p { display: none; } /* スマホではキー説明を隠す */
+  }
+  .tc-btn {
+    position: fixed;
+    bottom: 24px;
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.20);
+    border: 3px solid rgba(255, 255, 255, 0.55);
+    color: #fff;
+    font-size: 30px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: none;
+    z-index: 10;
+  }
+  .tc-btn:active { background: rgba(255, 255, 255, 0.42); }
+  #btn-left { left: 24px; }
+  #btn-right { left: 116px; }
+  #btn-jump {
+    right: 28px;
+    width: 96px;
+    height: 96px;
+    font-size: 18px;
+    background: rgba(110, 200, 120, 0.30);
+    border-color: rgba(180, 255, 190, 0.6);
+  }
 </style>
 </head>
 <body>
 <canvas id="game" width="960" height="480"></canvas>
 <p>←→ / A D : 移動 スペース / ↑ / W : ジャンプ</p>
+<div class="touch-controls">
+  <div class="tc-btn" id="btn-left">◀</div>
+  <div class="tc-btn" id="btn-right">▶</div>
+  <div class="tc-btn" id="btn-jump">JUMP</div>
+</div>
 <!-- file:// で動かすため ES modules は使わず、依存順に読み込む -->
 <script src="js/config.js"></script>
 <script src="js/gfx.js"></script>
@@ -36,5 +81,25 @@
 <script src="js/enemies.js"></script>
 <script src="js/player.js"></script>
 <script src="js/game.js"></script>
+<!-- タッチボタンをキー入力につなぐ(押すと該当キーを押した扱いにする) -->
+<script>
+(function () {
+  const bind = (id, code) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const press = (e) => { e.preventDefault(); Input.press(code); };
+    const release = (e) => { e.preventDefault(); Input.release(code); };
+    el.addEventListener('touchstart', press, { passive: false });
+    el.addEventListener('touchend', release, { passive: false });
+    el.addEventListener('touchcancel', release, { passive: false });
+    el.addEventListener('mousedown', press);
+    el.addEventListener('mouseup', release);
+    el.addEventListener('mouseleave', release);
+  };
+  bind('btn-left', 'ArrowLeft');
+  bind('btn-right', 'ArrowRight');
+  bind('btn-jump', 'Space'); // ジャンプ兼「決定」(タイトル/選択/クリア画面の進行にも使える)
+})();
+</script>
 </body>
 </html>
