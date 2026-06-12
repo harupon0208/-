@@ -60,6 +60,44 @@
     background: rgba(110, 200, 120, 0.30);
     border-color: rgba(180, 255, 190, 0.6);
   }
+
+  /* ミュートボタン(常時表示・右上) */
+  #btn-mute {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(15, 20, 35, 0.5);
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    z-index: 20;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  #btn-mute:active { background: rgba(15, 20, 35, 0.8); }
+
+  /* ポーズボタン(常時表示・右上、ミュートの左) */
+  #btn-pause {
+    position: fixed;
+    top: 12px;
+    right: 60px;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(15, 20, 35, 0.5);
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+    z-index: 20;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  #btn-pause:active { background: rgba(15, 20, 35, 0.8); }
 </style>
 </head>
 <body>
@@ -70,10 +108,30 @@
   <div class="tc-btn" id="btn-right">▶</div>
   <div class="tc-btn" id="btn-jump">JUMP</div>
 </div>
+<button id="btn-pause" title="ポーズ (P)">⏸</button>
+<button id="btn-mute" title="音のオン/オフ (M)">🔊</button>
+<!-- エラーが出たら画面に表示する(真っ暗の原因を見えるようにする一時的な仕掛け) -->
+<script>
+window.addEventListener('error', function (e) {
+  try {
+    var c = document.getElementById('game');
+    var x = c.getContext('2d');
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    x.fillStyle = '#300'; x.fillRect(0, 0, c.width, c.height);
+    x.fillStyle = '#fff'; x.font = '14px monospace'; x.textAlign = 'left';
+    var where = (e.filename || '').split('/').pop() + ':' + e.lineno;
+    x.fillText('ERROR: ' + (e.message || '') + '  (' + where + ')', 12, 30);
+    var stack = (e.error && e.error.stack) ? String(e.error.stack).split('\n') : [];
+    for (var i = 0; i < Math.min(stack.length, 6); i++) x.fillText(stack[i].slice(0, 116), 12, 56 + i * 18);
+  } catch (_) {}
+});
+</script>
 <!-- file:// で動かすため ES modules は使わず、依存順に読み込む -->
 <script src="js/config.js"></script>
 <script src="js/gfx.js"></script>
+<script src="js/themes.js"></script>
 <script src="js/input.js"></script>
+<script src="js/audio.js"></script>
 <script src="js/levels.js"></script>
 <script src="js/level.js"></script>
 <script src="js/camera.js"></script>
@@ -99,6 +157,27 @@
   bind('btn-left', 'ArrowLeft');
   bind('btn-right', 'ArrowRight');
   bind('btn-jump', 'Space'); // ジャンプ兼「決定」(タイトル/選択/クリア画面の進行にも使える)
+
+  // ポーズボタン
+  const pause = document.getElementById('btn-pause');
+  if (pause) {
+    pause.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (typeof game !== 'undefined') game.togglePause();
+    });
+  }
+
+  // ミュートボタン
+  const mute = document.getElementById('btn-mute');
+  if (mute) {
+    const sync = () => { mute.textContent = (typeof Sound !== 'undefined' && Sound.muted) ? '🔇' : '🔊'; };
+    sync();
+    mute.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (typeof Sound !== 'undefined') { Sound.unlock(); Sound.toggleMute(); }
+      sync();
+    });
+  }
 })();
 </script>
 </body>
