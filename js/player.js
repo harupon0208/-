@@ -2,21 +2,39 @@
 
 // ヒーローの体を局所座標(0,0)〜(w,h)に描く。呼び出し側で位置・つぶれを transform 済み。
 // 茶髪アホ毛・青コート(赤襟+金トリム)・白シャツ・青パンツ金ライン・赤ブーツの冒険者。
-function drawHeroBody(ctx, w, h, big, dir, animPhase, moving, onGround, blink, wallDir = 0) {
+function drawHeroBody(ctx, w, h, power, dir, animPhase, moving, onGround, blink, wallDir = 0, gliding = false) {
+  const big = power !== 'small';
+  const isFire = power === 'fire';
+  const isCape = power === 'cape';
   const hw = w / 2;
   const headR = Math.max(7, Math.round(w * 0.5));
   const headCx = hw;
   const headCy = headR + 3;
 
-  // 配色
-  const coat = big ? '#3a72de' : '#2a5ec4';   // 青コート/パンツ
-  const coatDk = '#1f49a0';
+  // 配色(ファイアは赤コート、フェザーは緑マントを後述で追加)
+  const coat = isFire ? '#e0512e' : big ? '#3a72de' : '#2a5ec4';   // コート/パンツ
+  const coatDk = isFire ? '#a8351a' : '#1f49a0';
   const red = '#d8392c';                       // 赤の差し色
   const gold = '#ffcf4a';                      // 金トリム
   const white = '#f3f1e7';                     // 白シャツ
   const skin = '#ffd9a6';
   const hair = '#a85b27';
   const glove = '#3a3030';
+
+  // フェザー: 背中になびく緑のマント(体より先に描いて背面に置く)
+  if (isCape) {
+    const sw = Math.sin(animPhase * 0.8) * 3 + (gliding ? -6 : 0);
+    const back = dir > 0 ? -1 : 1; // 進行方向の逆へなびく
+    ctx.fillStyle = '#2fa84f';
+    ctx.beginPath();
+    ctx.moveTo(hw, headCy + headR);
+    ctx.quadraticCurveTo(hw + back * (w * 0.7), h * 0.45 + sw, hw + back * (w * 0.55), h * 0.92 + sw);
+    ctx.lineTo(hw + back * 2, h * 0.7);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#1f7d39';
+    ctx.fillRect(hw - 3, headCy + headR - 2, 6, 4); // 留め具
+  }
 
   const legH = Math.round(h * 0.34);
   const legTop = h - legH;
@@ -158,11 +176,20 @@ class Player {
     this.vy = 0;
     this.onGround = false;
     this.hitWall = false;
-    this.big = false;
+    this.power = 'small';    // 'small' / 'big'(キノコ) / 'fire'(ファイア) / 'cape'(フェザー)
     this.invincible = 0;
+    this.starTimer = 0;      // 無敵スターの残り時間(>0で無敵+触れた敵を倒す)
     this.facing = 1;
     this.dead = false;
     this.deathTimer = 0;
+    this.justLanded = false; // このフレームに着地したか(着地音用)
+    this.landImpact = 0;     // 着地時の落下速度(音のピッチ用)
+    // パワーアップの能力
+    this.airJumps = 0;       // フェザー: 残り空中ジャンプ回数
+    this.fireCooldown = 0;   // ファイア: 連射クールダウン
+    this.justFired = false;  // このフレームに火球を撃ったか(game側で生成)
+    this.gliding = false;    // 滑空中か(描画用)
+    this.onIce = false;      // 氷の床に乗っているか(滑る。game側がテーマから設定)
 
     // 操作感まわり
     this.coyote = 0;
@@ -202,7 +229,17 @@ class Player {
     const prevBottom = this.y + this.h;
     this.justJumped = false;
     this.justWallKicked = false;
+    this.justLanded = false;
+    this.justFired = false;
     if (this.wallKickLock > 0) this.wallKickLock--;
+    if (this.starTimer > 0) this.starTimer--;
+    if (this.fireCooldown > 0) this.fireCooldown--;
+
+    // ファイア: アクションキーで火球を撃つ(実際の生成はgame側、最大数もgameが判定)
+    if (this.power === 'fire' && Input.actionPressed && this.fireCooldown <= 0) {
+      this.justFired = true;
+      this.fireCooldown = CONFIG.FIRE_COOLDOWN;
+    }
 
     // --- 横移動(地上/空中で効きを変え、反転時はさらに強く) ---
     // 壁キック直後は横入力を弱めて、蹴った勢いを活かす
@@ -217,7 +254,9 @@ class Player {
       this.vx = Math.min(this.vx + a, CONFIG.MOVE_SPEED);
       this.facing = 1;
     } else {
-      this.vx *= this.onGround ? CONFIG.GROUND_FRICTION : CONFIG.AIR_FRICTION;
+      // 氷の床(theme.tile.slippery)では摩擦を弱めて滑らせる
+      const groundFric = this.onIce ? CONFIG.SLIP_FRICTION : CONFIG.GROUND_FRICTION;
+      this.vx *= this.onGround ? groundFric : CONFIG.AIR_FRICTION;
       if (Math.abs(this.vx) < 0.08) this.vx = 0;
     }
 
@@ -229,8 +268,8 @@ class Player {
     }
     this.wallSliding = this.wallDir !== 0 && this.vy > 0;
 
-    // --- ジャンプ(コヨーテ + 先行入力 + 可変ジャンプ + 壁キック) ---
-    if (prevOnGround) this.coyote = CONFIG.COYOTE;
+    // --- ジャンプ(コヨーテ + 先行入力 + 可変ジャンプ + 壁キック + 二段ジャンプ) ---
+    if (prevOnGround) { this.coyote = CONFIG.COYOTE; this.airJumps = CONFIG.AIR_JUMPS; }
     else if (this.coyote > 0) this.coyote--;
     if (Input.jumpPressed) this.buffer = CONFIG.JUMP_BUFFER;
     else if (this.buffer > 0) this.buffer--;
@@ -255,6 +294,14 @@ class Player {
       this.wallSliding = false;
       const wx = this.wallDir > 0 ? this.x + this.w : this.x;
       Particles.dust(wx, this.y + this.h * 0.5, this.wallDir, 7);
+    } else if (this.buffer > 0 && !this.onGround && this.power === 'cape' && this.airJumps > 0) {
+      // フェザーの二段ジャンプ(空中でもう一度)
+      this.vy = CONFIG.AIR_JUMP_VEL;
+      this.airJumps--;
+      this.buffer = 0;
+      this.jumping = true;
+      this.justJumped = true;
+      Particles.dust(this.x + this.w / 2, this.y + this.h, 0, 7);
     }
     // ボタンを離したら上昇を短く切る(押し続けると高く飛ぶ)
     if (this.jumping && !Input.jump && this.vy < 0) {
@@ -276,6 +323,12 @@ class Player {
         Particles.dust(wx, this.y + this.h * 0.7, this.wallDir, 1);
       }
     }
+    // フェザーの滑空: 落下中にジャンプ長押しでゆっくり降りる
+    this.gliding = false;
+    if (this.power === 'cape' && Input.jump && !this.onGround && !this.wallSliding && this.vy > CONFIG.CAPE_GLIDE_SPEED) {
+      this.vy = CONFIG.CAPE_GLIDE_SPEED;
+      this.gliding = true;
+    }
     moveAndCollide(this, level);
 
     // 動く足場への乗り判定(前フレームで足場の上面より上にいた場合のみ)
@@ -293,6 +346,8 @@ class Player {
     // --- 着地・歩行エフェクト ---
     if (!prevOnGround && this.onGround) {
       this.squash = 8;
+      this.justLanded = true;
+      this.landImpact = fallSpeed;
       if (fallSpeed > 5) Particles.dust(this.x + this.w / 2, this.y + this.h, 0, 6);
     }
     if (this.squash > 0) this.squash--;
@@ -308,23 +363,42 @@ class Player {
     if (this.invincible > 0) this.invincible--;
   }
 
+  // 'small' 以外は大きいサイズ(既存コードの this.big 参照を温存)
+  get big() { return this.power !== 'small'; }
+
+  // 大サイズに(まだ小さいときだけ位置を持ち上げる)
+  _setBigSize() {
+    if (this.h !== this.hBig) { this.y -= this.hBig - this.h; this.h = this.hBig; }
+  }
+
+  // キノコ: 小さいときだけ big に(既に強化済みなら見た目だけ弾ませる)
   grow() {
-    if (this.big) return;
-    this.big = true;
-    this.y -= this.hBig - this.h;
-    this.h = this.hBig;
-    this.squash = 10; // パワーアップでぷるんと拡大
+    if (this.power !== 'small') { this.squash = 10; return; }
+    this.power = 'big';
+    this._setBigSize();
+    this.squash = 10;
+  }
+
+  // ファイア / フェザー: 上位パワーへ(常に大サイズ)
+  setPower(kind) {
+    this.power = kind;
+    this._setBigSize();
+    this.squash = 12;
   }
 
   shrink() {
+    this.power = 'small';
+    this.airJumps = 0;
     this.y += this.h - this.hSmall;
     this.h = this.hSmall;
-    this.big = false;
   }
 
+  // 無敵スターが効いているか
+  starActive() { return this.starTimer > 0; }
+
   hurt() {
-    if (this.invincible > 0 || this.dead) return;
-    if (this.big) {
+    if (this.invincible > 0 || this.starTimer > 0 || this.dead) return;
+    if (this.power !== 'small') {
       this.shrink();
       this.invincible = CONFIG.INVINCIBLE_FRAMES;
       Particles.dust(this.x + this.w / 2, this.y + this.h / 2, 0, 6);
@@ -351,6 +425,15 @@ class Player {
     const baseX = this.x - cam.x, baseY = this.y, w = this.w, h = this.h;
     const cx = baseX + w / 2, footY = baseY + h;
 
+    // 無敵スター中: 色が巡る発光オーラ(残り少ないと点滅して終了を予告)
+    if (this.starTimer > 0 && !this.dead) {
+      const ending = this.starTimer < 90 && (frame >> 2) % 2 === 0;
+      if (!ending) {
+        const hue = (frame * 8) % 360;
+        glow(ctx, cx, baseY + h / 2, w * 1.4, hueToRgb(hue), 0.5);
+      }
+    }
+
     if (!this.dead) softShadow(ctx, cx, footY - 1, w * 0.55, 5);
 
     // つぶれ・伸び(ジャンプ中は縦長、着地直後は横長)
@@ -376,8 +459,8 @@ class Player {
     ctx.save();
     ctx.translate(ox, oy);
     ctx.scale(sx, sy);
-    drawHeroBody(ctx, w, h, this.big, faceDir, this.animPhase, this.moving, this.onGround, blink,
-      this.wallSliding ? this.wallDir : 0);
+    drawHeroBody(ctx, w, h, this.power, faceDir, this.animPhase, this.moving, this.onGround, blink,
+      this.wallSliding ? this.wallDir : 0, this.gliding);
     ctx.restore();
   }
 }

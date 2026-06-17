@@ -8,9 +8,12 @@ const Input = {
   right: false,
   jump: false,
   jumpPressed: false,
+  action: false,         // ファイア等のアクション(押しっぱなし)
+  actionPressed: false,  // アクションを押した瞬間
 
   init() {
-    const used = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', 'KeyA', 'KeyD', 'KeyW'];
+    const used = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', 'KeyA', 'KeyD', 'KeyW',
+      'KeyX', 'KeyZ', 'ShiftLeft'];
     addEventListener('keydown', (e) => {
       if (used.includes(e.code)) e.preventDefault();
       if (!e.repeat) this._pressedBuffer.add(e.code);
@@ -37,5 +40,7 @@ const Input = {
     this.right = k.has('ArrowRight') || k.has('KeyD');
     this.jump = k.has('Space') || k.has('ArrowUp') || k.has('KeyW');
     this.jumpPressed = this.pressed.has('Space') || this.pressed.has('ArrowUp') || this.pressed.has('KeyW');
+    this.action = k.has('KeyX') || k.has('KeyZ') || k.has('ShiftLeft');
+    this.actionPressed = this.pressed.has('KeyX') || this.pressed.has('KeyZ') || this.pressed.has('ShiftLeft');
   },
 };

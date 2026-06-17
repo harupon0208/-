@@ -68,15 +68,29 @@ const Sound = {
     src.connect(g); g.connect(this.master); src.start(t0);
   },
 
-  play(name) {
+  // name: 効果音の種類。pitch: 周波数の倍率(1.0=既定)。速度や勢いに応じて鳴き分けに使う
+  play(name, pitch = 1) {
     if (!this.ctx || this.muted) return;
+    const p = (f) => f * pitch;
     switch (name) {
-      case 'jump': this._tone(420, 0.16, 'square', 0.4, 720); break;
+      case 'jump': this._tone(p(420), 0.16, 'square', 0.4, p(720)); break;
       case 'wallkick': this._tone(620, 0.12, 'square', 0.35, 360); break;
-      case 'stomp': this._noise(0.12, 0.5); this._tone(180, 0.1, 'square', 0.3, 90); break;
+      // 着地音: 落下が速いほど低く重い「ドスッ」(pitchで調整)
+      case 'land': this._noise(0.05, 0.18 * pitch); this._tone(p(150), 0.07, 'sine', 0.18, p(90)); break;
+      case 'stomp': this._noise(0.12, 0.5); this._tone(p(180), 0.1, 'square', 0.3, p(90)); break;
       case 'coin': this._tone(880, 0.07, 'square', 0.4); setTimeout(() => this._tone(1320, 0.12, 'square', 0.4), 70); break;
       case 'powerup': [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => this._tone(f, 0.12, 'triangle', 0.4), i * 70)); break;
+      case 'fireget': [659, 880, 1047].forEach((f, i) => setTimeout(() => this._tone(f, 0.1, 'sawtooth', 0.35), i * 60)); break;
+      case 'capeget': [784, 988, 1319].forEach((f, i) => setTimeout(() => this._tone(f, 0.12, 'triangle', 0.38), i * 65)); break;
+      case 'fire': this._tone(p(720), 0.09, 'square', 0.3, p(420)); break;
+      case 'spring': this._tone(300, 0.18, 'sine', 0.4, 1200); break;
+      case 'crumble': this._noise(0.1, 0.28); this._tone(220, 0.12, 'triangle', 0.2, 110); break;
+      case 'cannon': this._noise(0.08, 0.35); this._tone(160, 0.12, 'square', 0.3, 80); break;
+      case 'star': [659, 880, 1047, 1319].forEach((f, i) => setTimeout(() => this._tone(f, 0.1, 'square', 0.35), i * 55)); break;
+      case 'checkpoint': this._tone(784, 0.08, 'triangle', 0.4); setTimeout(() => this._tone(1175, 0.16, 'triangle', 0.4), 90); break;
+      case 'oneup': [784, 1047, 1319, 1568].forEach((f, i) => setTimeout(() => this._tone(f, 0.12, 'square', 0.38), i * 80)); break;
       case 'damage': this._tone(330, 0.3, 'sawtooth', 0.4, 90); break;
+      case 'gameover': [392, 330, 262, 196].forEach((f, i) => setTimeout(() => this._tone(f, 0.32, 'sawtooth', 0.4), i * 220)); break;
       case 'bosshit': this._noise(0.15, 0.5); this._tone(140, 0.18, 'sawtooth', 0.4, 70); break;
       case 'select': this._tone(660, 0.06, 'square', 0.3); break;
       case 'start': this._tone(523, 0.1, 'square', 0.4); setTimeout(() => this._tone(784, 0.16, 'square', 0.4), 90); break;
@@ -91,10 +105,12 @@ const Sound = {
     const melodies = {
       play: [523, 0, 659, 0, 784, 659, 523, 0, 587, 0, 698, 0, 880, 0, 784, 0],
       map: [392, 0, 523, 0, 659, 0, 523, 0, 440, 0, 587, 0, 523, 0, 392, 0],
+      // 無敵スター中の急かすような速いフレーズ
+      star: [1047, 1319, 1047, 784, 1047, 1319, 1568, 1319, 1047, 1319, 1047, 784],
     };
     const seq = melodies[kind] || melodies.play;
     let i = 0;
-    const stepMs = 200;
+    const stepMs = kind === 'star' ? 110 : 200;
     this.bgm = setInterval(() => {
       if (!this.ctx || this.muted) { i++; return; }
       const f = seq[i % seq.length];

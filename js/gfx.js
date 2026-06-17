@@ -47,6 +47,30 @@ function glow(ctx, x, y, r, color, alpha = 0.6) {
   ctx.globalCompositeOperation = 'source-over';
 }
 
+// ハート型のアイコンを(cx,cy)中心・大きさsで塗る(残機HUD用)
+function drawHeartIcon(ctx, cx, cy, s, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy + s * 0.7);
+  ctx.bezierCurveTo(cx + s, cy - s * 0.25, cx + s * 0.4, cy - s, cx, cy - s * 0.35);
+  ctx.bezierCurveTo(cx - s * 0.4, cy - s, cx - s, cy - s * 0.25, cx, cy + s * 0.7);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// 色相(0..360)を 'r,g,b' 文字列に変換(虹色エフェクト用、彩度・明度は固定)
+function hueToRgb(h) {
+  const c = 1, x = 1 - Math.abs(((h / 60) % 2) - 1);
+  let r = 0, g = 0, b = 0;
+  if (h < 60) { r = c; g = x; }
+  else if (h < 120) { r = x; g = c; }
+  else if (h < 180) { g = c; b = x; }
+  else if (h < 240) { g = x; b = c; }
+  else if (h < 300) { r = x; b = c; }
+  else { r = c; b = x; }
+  return `${(r * 255) | 0},${(g * 255) | 0},${(b * 255) | 0}`;
+}
+
 // パーティクルの単一プール(Input と同じくグローバルなシングルトン)
 const Particles = {
   list: [],

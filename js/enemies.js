@@ -147,8 +147,24 @@ class Hopper extends Enemy {
   draw(ctx, cam) { this.drawBody(ctx, cam, '#2eb24f', '#1a6c30'); }
 }
 
+// ワールド別ボスの差分(tier 1=W1既存 / 2=W2氷 / 3=W3魔界)
+const BOSS_TIERS = {
+  1: { hp: 3, walk: 1.2, walkLow: 1.8, jumpVel: -12, jumpDash: 2.5, jumpInt: 140, jumpIntLow: 90,
+       baseShots: 1, shotCap: 3, spread: 1.2, downShots: false,
+       body: ['#9a52d6', '#5c2d80'], horn: '#3c1c55', eye: '#e6362a', horns: 2, name: '魔王' },
+  2: { hp: 4, walk: 1.6, walkLow: 2.4, jumpVel: -12.5, jumpDash: 3.0, jumpInt: 115, jumpIntLow: 75,
+       baseShots: 2, shotCap: 4, spread: 1.5, downShots: false,
+       body: ['#67d0ec', '#2a6f9a'], horn: '#bfeaff', eye: '#2f6fff', horns: 2, name: '氷帝' },
+  3: { hp: 5, walk: 2.0, walkLow: 2.8, jumpVel: -13, jumpDash: 3.4, jumpInt: 95, jumpIntLow: 60,
+       baseShots: 3, shotCap: 5, spread: 1.8, downShots: true,
+       body: ['#c0453d', '#3a0e0e'], horn: '#180808', eye: '#ffd24a', horns: 3, name: '冥王' },
+};
+
 class Boss {
-  constructor(mx, my) {
+  constructor(mx, my, tier = 1) {
+    this.tier = tier;
+    const t = BOSS_TIERS[tier] || BOSS_TIERS[1];
+    this.cfg = t;
     this.w = 56;
     this.h = 60;
     this.x = mx;
@@ -157,14 +173,17 @@ class Boss {
     this.vy = 0;
     this.onGround = false;
     this.hitWall = false;
-    this.maxHp = 3;
-    this.hp = 3;
+    this.maxHp = t.hp;
+    this.hp = t.hp;
     this.invincible = 0;
     this.dead = false;
     this.deadTimer = 0;
-    this.jumpTimer = 120;
+    this.jumpTimer = t.jumpInt;
     this.didJump = false;
   }
+
+  // HPが半分以下で怒り(動きと弾が激化)
+  get enraged() { return this.hp <= Math.floor(this.maxHp / 2); }
 
   update(level, player, projectiles) {
     if (this.dead) {
@@ -172,15 +191,16 @@ class Boss {
       return;
     }
     if (this.invincible > 0) this.invincible--;
+    const t = this.cfg;
+    const enraged = this.enraged;
     const dir = Math.sign(player.x + player.w / 2 - (this.x + this.w / 2)) || 1;
 
     if (this.onGround) {
-      // HPが減るほど速く・頻繁に跳ぶ
-      this.vx = dir * (this.hp <= 1 ? 1.8 : 1.2);
+      this.vx = dir * (enraged ? t.walkLow : t.walk);
       if (--this.jumpTimer <= 0) {
-        this.vy = -12;
-        this.vx = dir * 2.5;
-        this.jumpTimer = this.hp <= 1 ? 90 : 140;
+        this.vy = t.jumpVel;
+        this.vx = dir * t.jumpDash;
+        this.jumpTimer = enraged ? t.jumpIntLow : t.jumpInt;
         this.didJump = true;
       }
     }
@@ -189,14 +209,19 @@ class Boss {
     moveAndCollide(this, level);
     if (this.hitWall) this.vx = 0;
 
-    // 着地した瞬間に弾を発射(HPが減るほど数が増える)
+    // 着地した瞬間に弾を発射(HPが減るほど扇状に増える)
     if (wasAirborne && this.onGround && this.didJump) {
       this.didJump = false;
-      const n = this.hp <= 1 ? 3 : this.hp === 2 ? 2 : 1;
+      const n = Math.min(t.shotCap, t.baseShots + (this.maxHp - this.hp));
       const cx = this.x + this.w / 2, cy = this.y + 20;
       for (let i = 0; i < n; i++) {
-        const vy = n === 1 ? 0 : (i - (n - 1) / 2) * 1.2;
+        const vy = n === 1 ? 0 : (i - (n - 1) / 2) * t.spread;
         projectiles.push(new Projectile(cx, cy, 4 * dir, vy));
+      }
+      // tier3: 斜め下に降り注ぐ追加弾
+      if (t.downShots) {
+        projectiles.push(new Projectile(cx, cy, 2.5 * dir, 3));
+        projectiles.push(new Projectile(cx, cy, -2.5 * dir, 3));
       }
     }
   }
@@ -213,35 +238,37 @@ class Boss {
   draw(ctx, cam, frame) {
     if (this.dead && this.deadTimer % 8 < 4) return;
     if (!this.dead && this.invincible > 0 && (frame >> 2) % 2 === 0) return;
+    const t = this.cfg;
     const x = this.x - cam.x, y = this.y, w = this.w, h = this.h;
     const dir = Math.sign(this.vx) || 1;
 
     softShadow(ctx, x + w / 2, y + h - 1, w * 0.5, 6);
 
-    // ツノ
-    ctx.fillStyle = '#3c1c55';
+    // ツノ(tierで本数・色が変わる)
+    ctx.fillStyle = t.horn;
     ctx.beginPath();
     ctx.moveTo(x + 6, y + 12); ctx.lineTo(x + 14, y - 10); ctx.lineTo(x + 24, y + 12);
     ctx.moveTo(x + w - 24, y + 12); ctx.lineTo(x + w - 14, y - 10); ctx.lineTo(x + w - 6, y + 12);
+    if (t.horns >= 3) { ctx.moveTo(x + w / 2 - 7, y + 8); ctx.lineTo(x + w / 2, y - 18); ctx.lineTo(x + w / 2 + 7, y + 8); }
     ctx.fill();
 
     // 体(角丸 + 縦グラデ)
     const grad = ctx.createLinearGradient(0, y, 0, y + h);
-    grad.addColorStop(0, '#9a52d6');
-    grad.addColorStop(1, '#5c2d80');
+    grad.addColorStop(0, t.body[0]);
+    grad.addColorStop(1, t.body[1]);
     roundRect(ctx, x, y + 4, w, h - 4, 14);
     ctx.fillStyle = grad;
     ctx.fill();
     // お腹のハイライト
     fillRound(ctx, x + 10, y + h - 26, w - 20, 18, 8, 'rgba(255,255,255,0.12)');
 
-    // 目(白目 + 赤い瞳を進行方向へ)
+    // 目(白目 + 瞳を進行方向へ)
     fillCircle(ctx, x + 18, y + 24, 9, '#fff');
     fillCircle(ctx, x + w - 18, y + 24, 9, '#fff');
-    fillCircle(ctx, x + 18 + dir * 3, y + 25, 4, '#e6362a');
-    fillCircle(ctx, x + w - 18 + dir * 3, y + 25, 4, '#e6362a');
+    fillCircle(ctx, x + 18 + dir * 3, y + 25, 4, t.eye);
+    fillCircle(ctx, x + w - 18 + dir * 3, y + 25, 4, t.eye);
     // 怒り眉
-    ctx.strokeStyle = '#3c1c55';
+    ctx.strokeStyle = t.horn;
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(x + 9, y + 14); ctx.lineTo(x + 25, y + 20);
@@ -257,9 +284,10 @@ class Boss {
       ctx.fill();
     }
 
-    // HPバー
+    // HPバー(maxHpぶん)
+    const barW = this.maxHp * 18;
     for (let i = 0; i < this.maxHp; i++) {
-      fillRound(ctx, x + (w - 50) / 2 + i * 18, y - 22, 14, 8, 3,
+      fillRound(ctx, x + (w - barW) / 2 + i * 18, y - 22, 14, 8, 3,
         i < this.hp ? '#ff4757' : 'rgba(0,0,0,0.35)');
     }
   }

@@ -7,7 +7,11 @@ class Level {
     this.rows = data.map.length;
     this.cols = Math.max(...data.map.map((r) => r.length));
     this.tiles = [];
-    this.spawns = { player: { x: T, y: 0 }, enemies: [], items: [], platforms: [], flag: null, boss: null };
+    this.spawns = {
+      player: { x: T, y: 0 }, enemies: [], items: [], coins: [], stars: [], checkpoints: [],
+      fireFlowers: [], feathers: [], springs: [], crumbles: [], cannons: [],
+      platforms: [], flag: null, boss: null,
+    };
 
     for (let r = 0; r < this.rows; r++) {
       const line = data.map[r];
@@ -15,7 +19,8 @@ class Level {
       for (let c = 0; c < this.cols; c++) {
         const ch = line[c] || '.';
         const x = c * T, y = r * T;
-        if (ch === '#' || ch === '=') {
+        // タイルに残す記号: 固体(# =) と 非固体マーカー(x ハザード / w 風)
+        if (ch === '#' || ch === '=' || ch === 'x' || ch === 'w') {
           tileRow.push(ch);
           continue;
         }
@@ -23,6 +28,15 @@ class Level {
           case 'P': this.spawns.player = { x, y }; break;
           case 'G': this.spawns.flag = { x, y }; break;
           case '*': this.spawns.items.push({ x, y }); break;
+          case 'o': this.spawns.coins.push({ x, y }); break;
+          case 's': this.spawns.stars.push({ x, y }); break;
+          case 'C': this.spawns.checkpoints.push({ x, y }); break;
+          case 'F': this.spawns.fireFlowers.push({ x, y }); break;
+          case 'V': this.spawns.feathers.push({ x, y }); break;
+          case '^': this.spawns.springs.push({ x, y }); break;
+          case ':': this.spawns.crumbles.push({ x, y }); break;
+          case '>': this.spawns.cannons.push({ x, y, dir: 1 }); break;
+          case '<': this.spawns.cannons.push({ x, y, dir: -1 }); break;
           case 'e': case 'f': case 'j': this.spawns.enemies.push({ x, y, type: ch }); break;
           case '-': this.spawns.platforms.push({ x, y, axis: 'h' }); break;
           case '|': this.spawns.platforms.push({ x, y, axis: 'v' }); break;
@@ -44,6 +58,18 @@ class Level {
     return t === '#' || t === '=';
   }
 
+  // ハザード(トゲ/溶岩。触れるとダメージ)
+  hazardAt(c, r) {
+    if (c < 0 || c >= this.cols || r < 0 || r >= this.rows) return false;
+    return this.tiles[r][c] === 'x';
+  }
+
+  // 風(上昇気流の列)
+  windAt(c, r) {
+    if (c < 0 || c >= this.cols || r < 0 || r >= this.rows) return false;
+    return this.tiles[r][c] === 'w';
+  }
+
   draw(ctx, cam, theme) {
     const T = CONFIG.TILE;
     const tl = (theme && theme.tile) || THEMES[0].tile;
@@ -63,6 +89,10 @@ class Level {
           } else {
             this._dirtFallback(ctx, tl, x, y, c, cap);
           }
+        } else if (t === 'x') {
+          this._drawHazard(ctx, tl, x, y, c);
+        } else if (t === 'w') {
+          this._drawWind(ctx, x, y, c);
         } else {
           if (sheet) ctx.drawImage(sheet, T * 2, 0, T, T, x, y, T, T);
           else this._blockFallback(ctx, tl, x, y);
@@ -125,6 +155,55 @@ class Level {
     fillCircle(ctx, x + T - 6, y + 6, 1.6, tl.blockEdge);
     fillCircle(ctx, x + 6, y + T - 6, 1.6, tl.blockEdge);
     fillCircle(ctx, x + T - 6, y + T - 6, 1.6, tl.blockEdge);
+  }
+
+  // ハザード(非固体)。溶岩テーマでは溶岩、それ以外は金属トゲを描く
+  _drawHazard(ctx, tl, x, y, c) {
+    const T = CONFIG.TILE;
+    if (tl.cap === 'lava') {
+      // 溶岩プール(下半分に発光)
+      const grad = ctx.createLinearGradient(0, y + T * 0.4, 0, y + T);
+      grad.addColorStop(0, '#ff8a2a');
+      grad.addColorStop(1, '#c02808');
+      ctx.fillStyle = grad;
+      ctx.fillRect(x, y + T * 0.45, T, T * 0.55);
+      ctx.fillStyle = 'rgba(255,220,120,0.7)';
+      const hsh = (c * 2654435761) >>> 0;
+      ctx.fillRect(x + (hsh % 10), y + T * 0.45, 6, 2);
+      ctx.fillRect(x + 14 + (hsh % 8), y + T * 0.5, 5, 2);
+    } else {
+      // 金属トゲ(上向きの三角を並べる)
+      ctx.fillStyle = '#b9c0c9';
+      const n = 4, w = T / n;
+      for (let i = 0; i < n; i++) {
+        ctx.beginPath();
+        ctx.moveTo(x + i * w, y + T);
+        ctx.lineTo(x + i * w + w / 2, y + T * 0.3);
+        ctx.lineTo(x + (i + 1) * w, y + T);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      for (let i = 0; i < n; i++) ctx.fillRect(x + i * w + w / 2 - 0.5, y + T * 0.3, 1, T * 0.4);
+      ctx.fillStyle = '#5a626e';
+      ctx.fillRect(x, y + T - 3, T, 3);
+    }
+  }
+
+  // 風(上昇気流。非固体)。上向きのシェブロンをうっすら
+  _drawWind(ctx, x, y, c) {
+    const T = CONFIG.TILE;
+    ctx.strokeStyle = 'rgba(200,235,255,0.4)';
+    ctx.lineWidth = 2;
+    const phase = ((c * 7) % 16);
+    for (let k = 0; k < 2; k++) {
+      const yy = y + 6 + k * 14 + phase * 0.4;
+      ctx.beginPath();
+      ctx.moveTo(x + 6, yy + 5);
+      ctx.lineTo(x + T / 2, yy);
+      ctx.lineTo(x + T - 6, yy + 5);
+      ctx.stroke();
+    }
   }
 }
 

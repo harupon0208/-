@@ -9,6 +9,13 @@ const Themes = {
     return THEMES[Math.max(0, Math.min(THEMES.length - 1, i))];
   },
 
+  // ステージindex → テーマ(ワールドごとの世界観割り当て)。未定義は巡回でフォールバック
+  forStage(i) {
+    const idx = (typeof STAGE_THEME !== 'undefined' && STAGE_THEME[i] !== undefined)
+      ? STAGE_THEME[i] : (i % THEMES.length);
+    return THEMES[Math.max(0, Math.min(THEMES.length - 1, idx))];
+  },
+
   // === 背景(空 → 遠景パララックス → 奥霧) ===
   drawBackground(ctx, t, cam, frame) {
     const W = CONFIG.WIDTH, H = CONFIG.HEIGHT;
@@ -467,7 +474,7 @@ const THEMES = [
     ambient: { kind: 'dust', color: '255,220,160', count: 28, size: [1, 2.4], vx: [-0.5, -0.1], vy: [-0.1, 0.1] },
     tile: { dirtTop: '#c79a64', dirtBottom: '#8a6238', cap: 'sand', capTop: '#e0bd84', capBottom: '#b8915a', capHi: '#f0d4a0', accent: '#8a6238', block: '#d8b070', blockEdge: '#8a6238', deco: '#fff0c8' },
   },
-  { // 9 溶岩のボス部屋
+  { // 9 溶岩のボス部屋(W1ボス)
     name: '溶岩の決戦場',
     sky: ['#3a0e0e', '#120608'],
     fog: { color: '90,20,10', strength: 0.5 },
@@ -479,4 +486,129 @@ const THEMES = [
     ambient: { kind: 'ember', color: '255,150,50', count: 26, size: [1, 2.4], vx: [-0.3, 0.3], vy: [-1.0, -0.3] },
     tile: { dirtTop: '#4a2418', dirtBottom: '#2a120c', cap: 'lava', capTop: '#7a2e16', capBottom: '#4a1c0e', capHi: '#ff7b3c', accent: '#ff7b1c', block: '#5a2818', blockEdge: '#2a120c', deco: '#ff9a3c' },
   },
+
+  // ===== WORLD 2: 空と氷雪 (index 9〜12) =====
+  { // 9 天空回廊
+    name: '天空回廊',
+    sky: ['#7ec8f5', '#dff2ff'],
+    sun: { x: 740, y: 110, r: 150, color: 'rgba(255,255,240,0.8)', core: 30 },
+    fog: { color: '230,245,255', strength: 0.4 },
+    vignette: 0.2, grade: 'rgba(180,225,255,0.07)', glow: '255,255,255',
+    parallax: [
+      { kind: 'clouds', color: 'rgba(255,255,255,0.5)', par: -0.1, baseY: 140, s: 1.7, span: 360 },
+      { kind: 'clouds', color: 'rgba(255,255,255,0.8)', par: -0.26, baseY: 250, s: 1.3, span: 300 },
+      { kind: 'mountains', color: '#bcd8ee', par: -0.13, baseY: 400, amp: 120, span: 320, snow: '#ffffff' },
+    ],
+    ambient: { kind: 'dust', color: '255,255,255', count: 22, size: [1, 2.4], vx: [-0.4, -0.1], vy: [-0.1, 0.1] },
+    tile: { dirtTop: '#cfe6f5', dirtBottom: '#9bbcd6', cap: 'rock', capTop: '#ffffff', capBottom: '#cfe2f0', capHi: '#ffffff', accent: '#a9cbe0', block: '#dff0fb', blockEdge: '#9bbcd6', deco: '#ffffff' },
+  },
+  { // 10 氷結の谷(滑る)
+    name: '氷結の谷',
+    sky: ['#a7c8e0', '#e8f3fa'],
+    fog: { color: '220,238,248', strength: 0.45 },
+    vignette: 0.28, grade: 'rgba(180,215,240,0.1)', glow: '200,235,255',
+    parallax: [
+      { kind: 'mountains', color: '#8fb0c8', par: -0.12, baseY: 390, amp: 150, span: 320, snow: '#eef6fb' },
+      { kind: 'hills', color: '#cfe2ee', par: -0.24, baseY: 405, amp: 46 },
+      { kind: 'trees', color: '#7f99a8', trunk: '#5a6470', par: -0.4, baseY: 418 },
+    ],
+    ambient: { kind: 'snow', color: '255,255,255', count: 44, size: [1, 2.6], vx: [-0.6, 0.1], vy: [0.4, 1.2] },
+    tile: { dirtTop: '#a8bccc', dirtBottom: '#74899a', cap: 'snow', capTop: '#ffffff', capBottom: '#dfeaf2', capHi: '#ffffff', accent: '#bcd6e8', block: '#cfe6f5', blockEdge: '#8fb0c8', deco: '#ffffff', slippery: true },
+  },
+  { // 11 オーロラ夜空
+    name: 'オーロラ夜空',
+    sky: ['#0b1733', '#1d3a5a'],
+    fog: { color: '40,80,120', strength: 0.35 },
+    vignette: 0.5, grade: 'rgba(40,120,140,0.14)', glow: '150,255,210',
+    parallax: [
+      { kind: 'stars', color: '#fff', par: -0.05, baseY: 240 },
+      { kind: 'mountains', color: '#16283f', par: -0.13, baseY: 400, amp: 150, span: 340, snow: '#3a5a72' },
+      { kind: 'hills', color: '#10202f', par: -0.26, baseY: 410, amp: 44 },
+    ],
+    ambient: { kind: 'firefly', color: '150,255,210', count: 16, size: [1.2, 2.4], vx: [-0.2, 0.2], vy: [-0.15, 0.15] },
+    tile: { dirtTop: '#3a4a5a', dirtBottom: '#222e3a', cap: 'snow', capTop: '#dfeefa', capBottom: '#9fc0d6', capHi: '#ffffff', accent: '#7be0ff', block: '#3e5066', blockEdge: '#202c3a', deco: '#aef0ff' },
+  },
+  { // 12 氷結の決戦場(W2ボス・滑る)
+    name: '氷結の決戦場',
+    sky: ['#0c2238', '#08121e'],
+    fog: { color: '40,90,130', strength: 0.5 },
+    vignette: 0.6, grade: 'rgba(40,110,150,0.16)', glow: '150,230,255',
+    parallax: [
+      { kind: 'cave', color: '#0c1c2a', par: -0.1, baseY: 0, amp: 110, span: 140, top: 12 },
+      { kind: 'pillars', color: '#0a1824', par: -0.26, baseY: 440, amp: 200, span: 200 },
+    ],
+    ambient: { kind: 'snow', color: '210,240,255', count: 30, size: [1, 2.2], vx: [-0.5, 0.2], vy: [0.3, 0.9] },
+    tile: { dirtTop: '#3a5266', dirtBottom: '#1e2c38', cap: 'snow', capTop: '#cfeefa', capBottom: '#8fc0d8', capHi: '#ffffff', accent: '#9be8ff', block: '#3e5a72', blockEdge: '#1c2a38', deco: '#aef0ff', slippery: true },
+  },
+
+  // ===== WORLD 3: 魔界と溶岩 (index 13〜17) =====
+  { // 13 影の回廊
+    name: '影の回廊',
+    sky: ['#1a1026', '#0a0612'],
+    fog: { color: '60,30,80', strength: 0.45 },
+    vignette: 0.6, grade: 'rgba(80,30,110,0.16)', glow: '180,120,255',
+    parallax: [
+      { kind: 'pillars', color: '#1a1026', par: -0.12, baseY: 420, amp: 160, span: 210 },
+      { kind: 'pillars', color: '#120a1c', par: -0.26, baseY: 440, amp: 200, span: 160 },
+    ],
+    ambient: { kind: 'firefly', color: '180,120,255', count: 16, size: [1, 2], vx: [-0.2, 0.2], vy: [-0.2, 0.1] },
+    tile: { dirtTop: '#3a2a4a', dirtBottom: '#201630', cap: 'rock', capTop: '#5a3f78', capBottom: '#3a2858', capHi: '#7a5aa0', accent: '#b48aff', block: '#3e2c58', blockEdge: '#1c1230', deco: '#c8a0ff' },
+  },
+  { // 14 紅蓮の坑道
+    name: '紅蓮の坑道',
+    sky: ['#2a0c0c', '#100406'],
+    fog: { color: '90,20,10', strength: 0.5 },
+    vignette: 0.6, grade: 'rgba(140,30,10,0.16)', glow: '255,140,50',
+    parallax: [
+      { kind: 'cave', color: '#1c0a0a', par: -0.1, baseY: 0, amp: 110, span: 130, top: 12 },
+      { kind: 'pillars', color: '#260e0e', par: -0.26, baseY: 440, amp: 200, span: 200 },
+    ],
+    ambient: { kind: 'ember', color: '255,140,50', count: 26, size: [1, 2.4], vx: [-0.3, 0.3], vy: [-1.0, -0.3] },
+    tile: { dirtTop: '#4a241a', dirtBottom: '#2a120c', cap: 'lava', capTop: '#7a2e16', capBottom: '#4a1c0e', capHi: '#ff7b3c', accent: '#ff7b1c', block: '#5a2818', blockEdge: '#2a120c', deco: '#ff9a3c' },
+  },
+  { // 15 魔法陣の間
+    name: '魔法陣の間',
+    sky: ['#1a0a22', '#0a0410'],
+    fog: { color: '80,20,90', strength: 0.45 },
+    vignette: 0.6, grade: 'rgba(120,20,120,0.16)', glow: '230,90,255',
+    parallax: [
+      { kind: 'pillars', color: '#22102e', par: -0.14, baseY: 425, amp: 150, span: 200 },
+      { kind: 'cave', color: '#160a1e', par: -0.1, baseY: 0, amp: 100, span: 150, top: 10 },
+    ],
+    ambient: { kind: 'firefly', color: '230,90,255', count: 18, size: [1, 2.2], vx: [-0.2, 0.2], vy: [-0.2, 0.15] },
+    tile: { dirtTop: '#3e2450', dirtBottom: '#221432', cap: 'rock', capTop: '#6a3a8a', capBottom: '#43265e', capHi: '#9a5ac0', accent: '#e65aff', block: '#46285e', blockEdge: '#1e1030', deco: '#f0a0ff' },
+  },
+  { // 16 虚空
+    name: '虚空',
+    sky: ['#05060f', '#000000'],
+    fog: { color: '20,20,50', strength: 0.3 },
+    vignette: 0.7, grade: 'rgba(20,20,60,0.18)', glow: '160,160,255',
+    parallax: [
+      { kind: 'stars', color: '#fff', par: -0.04, baseY: 360 },
+      { kind: 'stars', color: '#bfc8ff', par: -0.1, baseY: 240 },
+    ],
+    ambient: { kind: 'firefly', color: '160,160,255', count: 20, size: [1, 2], vx: [-0.15, 0.15], vy: [-0.1, 0.1] },
+    tile: { dirtTop: '#2a2a3e', dirtBottom: '#16161f', cap: 'rock', capTop: '#44446a', capBottom: '#2a2a44', capHi: '#6a6aa0', accent: '#9a9aff', block: '#33334d', blockEdge: '#16161f', deco: '#c8c8ff' },
+  },
+  { // 17 煉獄の決戦場(W3ボス)
+    name: '煉獄の決戦場',
+    sky: ['#2a0608', '#0a0204'],
+    fog: { color: '110,20,10', strength: 0.55 },
+    vignette: 0.68, grade: 'rgba(150,20,10,0.18)', glow: '255,120,40',
+    parallax: [
+      { kind: 'cave', color: '#1c0808', par: -0.1, baseY: 0, amp: 110, span: 140, top: 12 },
+      { kind: 'pillars', color: '#260a0a', par: -0.26, baseY: 440, amp: 210, span: 190 },
+    ],
+    ambient: { kind: 'ember', color: '255,120,40', count: 30, size: [1, 2.6], vx: [-0.35, 0.35], vy: [-1.1, -0.3] },
+    tile: { dirtTop: '#4a1c14', dirtBottom: '#280e0a', cap: 'lava', capTop: '#8a2e16', capBottom: '#4a160c', capHi: '#ff6b2c', accent: '#ff6b1c', block: '#5a2014', blockEdge: '#280e0a', deco: '#ff8a3c' },
+  },
+];
+
+// ステージ index → テーマ index の割り当て(全27面)。
+// THEMES の index: 0-8=既存9テーマ / 9天空回廊 10氷結の谷 11オーロラ 12氷結の決戦場(W2ボス)
+//   / 13影の回廊 14紅蓮の坑道 15魔法陣の間 16虚空 17煉獄の決戦場(W3ボス)。
+const STAGE_THEME = [
+  0, 1, 2, 3, 4, 5, 6, 7, 8,        // W1: 既存(9面目=溶岩の決戦場 idx8)
+  9, 10, 9, 11, 10, 11, 10, 9, 12,  // W2: 天空・氷雪(9面目=氷結の決戦場 idx12)
+  13, 6, 14, 15, 8, 13, 16, 14, 17, // W3: 魔界・溶岩(9面目=煉獄の決戦場 idx17)
 ];
