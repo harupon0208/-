@@ -1,0 +1,9 @@
+{
+  "name": "super-jump-quest",
+  "version": "1.1.0",
+  "description": "ブラウザ製の横スクロールアクション(スーパージャンプクエスト)。file:// で index.html を開くだけで遊べる。",
+  "private": true,
+  "scripts": {
+    "test": "node tests/run.js"
+  }
+}

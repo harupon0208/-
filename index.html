@@ -60,6 +60,15 @@
     background: rgba(110, 200, 120, 0.30);
     border-color: rgba(180, 255, 190, 0.6);
   }
+  #btn-fire {
+    right: 132px;
+    bottom: 40px;
+    width: 70px;
+    height: 70px;
+    font-size: 26px;
+    background: rgba(240, 130, 60, 0.30);
+    border-color: rgba(255, 190, 140, 0.6);
+  }
 
   /* ミュートボタン(常時表示・右上) */
   #btn-mute {
@@ -107,6 +116,7 @@
   <div class="tc-btn" id="btn-left">◀</div>
   <div class="tc-btn" id="btn-right">▶</div>
   <div class="tc-btn" id="btn-jump">JUMP</div>
+  <div class="tc-btn" id="btn-fire">🔥</div>
 </div>
 <button id="btn-pause" title="ポーズ (P)">⏸</button>
 <button id="btn-mute" title="音のオン/オフ (M)">🔊</button>
@@ -157,6 +167,7 @@ window.addEventListener('error', function (e) {
   bind('btn-left', 'ArrowLeft');
   bind('btn-right', 'ArrowRight');
   bind('btn-jump', 'Space'); // ジャンプ兼「決定」(タイトル/選択/クリア画面の進行にも使える)
+  bind('btn-fire', 'KeyX');  // アクション(ファイアフラワーで火球)
 
   // ポーズボタン
   const pause = document.getElementById('btn-pause');
